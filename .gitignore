@@ -1,0 +1,7 @@
+*.docx
+*.code-workspace
+Client/.vscode
+Include/.vscode
+Server/.vscode
+*.o
+
