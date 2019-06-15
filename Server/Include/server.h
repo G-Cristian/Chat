@@ -13,6 +13,7 @@ class Server{
 public:
     typedef int Result;
     Server(int port):
+        _criticalError(false),
         _port(port){
     }
     Result start();
@@ -49,6 +50,7 @@ private:
     static void* listen(void*);
     Result listenClient(std::shared_ptr<ClientData>);
 
+    bool _criticalError;
     int _port;
     std::shared_ptr<Connection> _serverConnection;
     std::map<std::string, std::shared_ptr<ClientData>> _clients;

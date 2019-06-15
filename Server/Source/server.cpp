@@ -1,3 +1,4 @@
+#include "../../Include/commands.h"
 #include "../Include/server.h"
 #include <iostream>
 #include <list>
@@ -25,7 +26,7 @@ int Server::start() {
     globalGroup->name = GLOBAL_GROUP_NAME;
     _groups[GLOBAL_GROUP_NAME] = shared_ptr<Group>(globalGroup);
 
-    while(true){
+    while(!_criticalError){
         std::shared_ptr<Connection> clientConnection = _serverConnection->acceptConnection();
 
         threads.push_back(crerateListenerThread(clientConnection));
@@ -69,11 +70,22 @@ int Server::listenClient(std::shared_ptr<Server::ClientData> clientData){
     using namespace std;
     
     shared_ptr<Connection> clientConnection = clientData->connection;
-    pair<int,std::string> rcvInfo;
+    pair<int,shared_ptr<char>> rcvInfo;
 
     while((rcvInfo = clientConnection->rcvMsg()).first > 0){
-        cout << rcvInfo.second << endl;
-        clientConnection->sendMsg("Received "+rcvInfo.second);
+        char command = rcvInfo.second.get()[0];
+        switch(command){
+            case CLIENT_CONNECTS:
+                break;
+            case CLIENT_SENDS_MESSAGE:
+                    cout << &(rcvInfo.second.get()[1]) << endl;
+                    clientConnection->sendMsg("Received ");
+                break;
+            case CLIENT_LEAVES_CHAT:
+                break;
+            default:
+                throw "Should never enter this case option";
+        }
     }
 
     if(rcvInfo.first == -1){

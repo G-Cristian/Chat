@@ -1,7 +1,9 @@
+#include "../../Include/commands.h"
 #include "../../Include/connection.h"
 #include <iostream>
 #include <memory>
 #include <string>
+#include <string.h>
 
 
 using namespace std;
@@ -18,19 +20,22 @@ int main(int argc, char *argv[]){
 
     string msg;
 
-    cin >> msg;
+   // cin >> msg;
 
-    if(!connection->sendMsg(msg)){
-        cerr << "Error sending" << endl;
-        return 1;
-    }
+    //if(!connection->sendMsg(msg.c_str())){
+     //   cerr << "Error sending" << endl;
+      //  return 1;
+    //}
 
-    std::pair<int,std::string> rcvInfo;
+    std::pair<int,std::shared_ptr<char>> rcvInfo;
 
-    rcvInfo = connection->rcvMsg();
-    cout << rcvInfo.second << endl;
+    //rcvInfo = connection->rcvMsg();
+    //cout << rcvInfo.second << endl;
 
-    if(!connection->sendMsg("bye")){
+    char cmd[300];
+    cmd[0] = CLIENT_SENDS_MESSAGE;
+    strcpy(&(cmd[1]),"Hola");
+    if(!connection->sendMsg(cmd)){
         cerr << "Error sending" << endl;
         return 1;
     }

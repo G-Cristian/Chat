@@ -20,33 +20,6 @@ std::shared_ptr<Connection> Connection::acceptConnection()const{
     return connection;
 }
 
-int Connection::sendMsg(const std::string &msg)const{
-    int len = msg.length() + 1;
-    int sent = 0;
-    const char *str = msg.c_str();
-    do{
-        len -= sent;
-        str += sent;
-        sent = send(endpoint, str, len, 0);
-        if(sent == -1){
-            return 0;
-        }
-    }while(sent != len);
-
-    return 1;
-}
-
-std::pair<int, std::string> Connection::rcvMsg()const{
-    char buff[50];
-
-    int recvLen = 0;
-    recvLen=recv(endpoint, (void*)buff,50,0);
-   // if(recvLen == -1){
-   //     return {-1, ""};
-   // }
-    return {recvLen, buff};
-}
-
 std::shared_ptr<Connection> ConnectionFactory::createServerConnection(PORT port) const{
     struct in_addr inAddr;
     inAddr.s_addr = INADDR_ANY;
