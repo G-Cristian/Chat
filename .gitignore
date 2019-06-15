@@ -1,4 +1,5 @@
 *.docx
+*.docx#
 *.code-workspace
 Client/.vscode
 Include/.vscode
