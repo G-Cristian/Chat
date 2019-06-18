@@ -2,6 +2,7 @@
 #define _CONNECTION_H_
 
 #include <arpa/inet.h>
+#include <cstring>
 #include <memory>
 #include <netinet/in.h>
 #include <string>
@@ -21,8 +22,15 @@ struct Connection{
     SOCKADDR sockaddr;
     SOCKLEN sockaddrLen;
 
+    Connection():port(0),endpoint(-1),sockaddrLen(0){
+        std::memset((void*)(&sockaddr), 0, sizeof(SOCKADDR));
+    }
+
     ~Connection(){
-        close(endpoint);
+        if(endpoint != -1){
+            close(endpoint);
+            endpoint = -1;
+        }
     }
 
     int listen() const;

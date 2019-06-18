@@ -2,6 +2,7 @@
 #define _SERVER_H_
 
 #include "../../Include/connection.h"
+#include "../../Include/semaphore.h"
 #include <list>
 #include <map>
 #include <memory>
@@ -15,6 +16,13 @@ public:
     Server(int port):
         _criticalError(false),
         _port(port){
+        ::init(&_clientsMutex);
+        ::init(&_groupsMutex);
+    }
+
+    ~Server(){
+        ::destroy(&_groupsMutex);
+        ::destroy(&_clientsMutex);
     }
     Result start();
 private:
@@ -53,6 +61,8 @@ private:
     bool _criticalError;
     int _port;
     std::shared_ptr<Connection> _serverConnection;
+    Mutex _clientsMutex;
+    Mutex _groupsMutex;
     std::map<std::string, std::shared_ptr<ClientData>> _clients;
     std::map<std::string, std::shared_ptr<Group>> _groups;
 };
