@@ -33,28 +33,30 @@ int main(int argc, char *argv[]){
     //cout << rcvInfo.second << endl;
 
     char cmd[300];
-    cmd[0] = CLIENT_SENDS_MESSAGE;
-    strcpy(&(cmd[1]),"Hola");
+    string name;
+    cin >> name;
+    cmd[0] = CLIENT_CONNECTS;
+    strcpy(&(cmd[1]),name.c_str());
     if(!connection->sendMsg(cmd)){
         cerr << "Error sending" << endl;
         return 1;
     }
 
-    rcvInfo = connection->rcvMsg();
-    cout << rcvInfo.second << endl;
+    //rcvInfo = connection->rcvMsg();
+    //cout << rcvInfo.second << endl;
 
-    if(rcvInfo.first == -1){
-        cout << rcvInfo.second << endl;
-        cerr << "Error receiving." << endl;
-        return 1;
-    }
+    //if(rcvInfo.first == -1){
+    //    cout << rcvInfo.second << endl;
+    //    cerr << "Error receiving." << endl;
+    //    return 1;
+    //}
 
-    if(rcvInfo.first == 0){
-        cout << rcvInfo.second << endl;
-        cout << "Client closed connection." << endl;
-    }
+    //if(rcvInfo.first == 0){
+    //    cout << rcvInfo.second << endl;
+    //    cout << "Client closed connection." << endl;
+    //}
 
-    cout << "Congrats" << endl;
+    cout << "End" << endl;
 
     return 0;
 }

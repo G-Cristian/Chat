@@ -4,6 +4,10 @@
 #include <list>
 #include <pthread.h>
 #include <string>
+#include <string.h>
+
+#define LOCK_WRITE_GROUP() do{ ::lock(&_groupsServiceMutex); ::lock(&_groupsMutex); ::unlock(&_groupsServiceMutex); }while(false)
+#define UNLOCK_WRITE_GROUP() do{ ::unlock(&_groupsMutex); }while(false)
 
 const std::string Server::GLOBAL_GROUP_NAME = "_GLOBALGROUP";
 
@@ -57,10 +61,10 @@ void* Server::listen(void *data){
     Server *server = clientData->server;
     
     if(server->listenClient(clientData)){
-        cout << "Congrats" << endl;
+        cout << "Client disconnected successfully." << endl;
     }
     else{
-        cout << "Error" << endl;
+        cout << "Error listening client." << endl;
     }
 
     return NULL;
@@ -74,12 +78,26 @@ int Server::listenClient(std::shared_ptr<Server::ClientData> clientData){
 
     while((rcvInfo = clientConnection->rcvMsg()).first > 0){
         char command = rcvInfo.second.get()[0];
+        char *data = &(rcvInfo.second.get()[1]);
+        size_t dataLen = strlen(data);
         switch(command){
             case CLIENT_CONNECTS:
+                if(connectClient(string(data), clientData)){
+                    cout << "Client connected." << endl;
+                    //TODO: Send message to client that connection was a success.
+                }
+                else{
+                    cout << "Error connecting client." << endl;
+                    //TODO: Send message to client that name already exist.
+                }
                 break;
             case CLIENT_SENDS_MESSAGE:
-                    cout << &(rcvInfo.second.get()[1]) << endl;
-                    clientConnection->sendMsg("Received ");
+                    if(sendMessage(string(data))){
+                        cout << "Message sent." << endl;
+                    }
+                    else{
+                        cout << "Error sending message." << endl;
+                    }
                 break;
             case CLIENT_LEAVES_CHAT:
                 break;
@@ -98,6 +116,49 @@ int Server::listenClient(std::shared_ptr<Server::ClientData> clientData){
         cout << rcvInfo.second << endl;
         cout << "Client closed connection." << endl;
     }
+
+    return 1;
+}
+
+Server::Result Server::connectClient(const std::string &name, std::shared_ptr<ClientData> clientData){
+    using namespace std;
+    Result result = 1;
+    LOCK_WRITE_GROUP();
+    ::lock(&_clientsMutex);
+    
+    auto server = clientData->server;
+    auto clientsIt = _clients.find(name);
+    if(clientsIt == _clients.end()){
+        _clients.insert({name, clientData});
+        _groups[GLOBAL_GROUP_NAME]->clients.push_back(clientData);
+    }
+    else{
+        result = 0;
+    }
+    
+    ::unlock(&_clientsMutex);
+    UNLOCK_WRITE_GROUP();
+    return result;
+}
+
+Server::Result Server::sendMessage(const std::string&){
+    ::lock(&_groupsServiceMutex);
+    ::lock(&_groupsReadCountMutex);
+    if(_groupsReadCount == 0){
+        ::lock(&_groupsMutex);
+    }
+    ++_groupsReadCount;
+    ::unlock(&_groupsReadCountMutex);
+    ::unlock(&_groupsServiceMutex);
+
+    //TODO: Send message to all member of group
+
+    ::lock(&_groupsReadCountMutex);
+    --_groupsReadCount;
+    if(_groupsReadCount == 0){
+        ::unlock(&_groupsMutex);
+    }
+    ::unlock(&_groupsReadCountMutex);
 
     return 1;
 }

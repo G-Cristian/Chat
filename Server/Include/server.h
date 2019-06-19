@@ -15,9 +15,12 @@ public:
     typedef int Result;
     Server(int port):
         _criticalError(false),
-        _port(port){
+        _port(port),
+        _groupsReadCount(0){
         ::init(&_clientsMutex);
         ::init(&_groupsMutex);
+        ::init(&_groupsReadCountMutex);
+        ::init(&_groupsServiceMutex);
     }
 
     ~Server(){
@@ -26,6 +29,11 @@ public:
     }
     Result start();
 private:
+    Server(const Server&) = delete;
+    Server(Server&&) = delete;
+    Server& operator=(const Server&)=delete;
+    Server& operator=(Server&&)=delete;
+
     static const std::string GLOBAL_GROUP_NAME;
 
     struct ClientData{
@@ -57,12 +65,18 @@ private:
     pthread_t crerateListenerThread(std::shared_ptr<Connection>);
     static void* listen(void*);
     Result listenClient(std::shared_ptr<ClientData>);
+    Result connectClient(const std::string&, std::shared_ptr<ClientData>);
+    Result sendMessage(const std::string&);
 
     bool _criticalError;
     int _port;
     std::shared_ptr<Connection> _serverConnection;
     Mutex _clientsMutex;
     Mutex _groupsMutex;
+    Mutex _groupsReadCountMutex;
+    Mutex _groupsServiceMutex;
+    int _groupsReadCount;
+
     std::map<std::string, std::shared_ptr<ClientData>> _clients;
     std::map<std::string, std::shared_ptr<Group>> _groups;
 };
