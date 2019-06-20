@@ -1,4 +1,5 @@
 #include "../../Include/connection.h"
+#include "../../Include/debugger.h"
 #include "../Include/server.h"
 #include <iostream>
 #include <memory>
@@ -12,11 +13,19 @@ int main(int argc, char *argv[]){
         return 1;
     }
 
-    Server server(atoi(argv[1]));
+    Debugger::initInstance(std::cout, std::cerr);
+    try{
+        Server server(atoi(argv[1]));
 
-    if(!server.start()){
-        cerr << "Cannot listen" << endl;
+        if(!server.start()){
+            Debugger::getInstance()->printErr("Cannot listen");
+        }
     }
+    catch(string msg){
+        Debugger::getInstance()->printErr(msg);
+    }
+
+    Debugger::dispose();
 
     return 0;
 }

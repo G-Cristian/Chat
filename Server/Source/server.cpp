@@ -1,4 +1,5 @@
 #include "../../Include/commands.h"
+#include "../../Include/debugger.h"
 #include "../Include/server.h"
 #include <iostream>
 #include <list>
@@ -31,8 +32,9 @@ int Server::start() {
     _groups[GLOBAL_GROUP_NAME] = shared_ptr<Group>(globalGroup);
 
     while(!_criticalError){
+        Debugger::getInstance()->print("Waiting client connection.");
         std::shared_ptr<Connection> clientConnection = _serverConnection->acceptConnection();
-
+        Debugger::getInstance()->print("Client connection created.");
         threads.push_back(crerateListenerThread(clientConnection));
     }
 
@@ -50,6 +52,12 @@ pthread_t Server::crerateListenerThread(std::shared_ptr<Connection> clientConnec
     clientData->connection = clientConnection;
 
     int err = pthread_create(&threadId, NULL, Server::listen, (void*)clientData);
+    if(!err){
+        Debugger::getInstance()->print("Created listener thread.");
+    }
+    else{
+        Debugger::getInstance()->print("Error creating listener thread.");
+    }
 
     return threadId;
 }
@@ -61,10 +69,10 @@ void* Server::listen(void *data){
     Server *server = clientData->server;
     
     if(server->listenClient(clientData)){
-        cout << "Client disconnected successfully." << endl;
+        Debugger::getInstance()->print("Client disconnected successfully.");
     }
     else{
-        cout << "Error listening client." << endl;
+        Debugger::getInstance()->print("Error listening client.");
     }
 
     return NULL;
@@ -72,49 +80,76 @@ void* Server::listen(void *data){
 
 int Server::listenClient(std::shared_ptr<Server::ClientData> clientData){
     using namespace std;
+    Debugger::getInstance()->print("Listening client.");
     
     shared_ptr<Connection> clientConnection = clientData->connection;
     pair<int,shared_ptr<char>> rcvInfo;
-
+    Debugger::getInstance()->print("Receiving messages");
     while((rcvInfo = clientConnection->rcvMsg()).first > 0){
         char command = rcvInfo.second.get()[0];
         char *data = &(rcvInfo.second.get()[1]);
         size_t dataLen = strlen(data);
         switch(command){
             case CLIENT_CONNECTS:
+            {
+                char sendInfo[300];
+                sendInfo[0] = SERVER_COMMAND_STATUS;
+                sendInfo[2] = '\0';
                 if(connectClient(string(data), clientData)){
-                    cout << "Client connected." << endl;
-                    //TODO: Send message to client that connection was a success.
+                    Debugger::getInstance()->print("Client connected.");
+                    sendInfo[1] = STATUS_OK;
                 }
                 else{
-                    cout << "Error connecting client." << endl;
-                    //TODO: Send message to client that name already exist.
+                    Debugger::getInstance()->print("Error connecting client.");
+                    sendInfo[1] = STATUS_CLIENT_NAME_EXISTS;
                 }
-                break;
+                int remainingRetries = 10;
+                while(!clientConnection->sendMsg(sendInfo) && remainingRetries > 0){
+                    Debugger::getInstance()->print("Error sending status to client.");
+                    --remainingRetries;
+                }
+                if(remainingRetries > 0){
+                    Debugger::getInstance()->print("Status sent to client.");
+                }
+                else{
+                    Debugger::getInstance()->print("Status not sent to client.");
+                }
+            }
+            break;
             case CLIENT_SENDS_MESSAGE:
-                    if(sendMessage(string(data))){
-                        cout << "Message sent." << endl;
-                    }
-                    else{
-                        cout << "Error sending message." << endl;
-                    }
-                break;
+            {
+                if(sendMessage(string(data))){
+                    Debugger::getInstance()->print("Message sent.");
+                }
+                else{
+                    Debugger::getInstance()->print("Error sending message.");
+                }
+            }
+            break;
             case CLIENT_LEAVES_CHAT:
-                break;
-            default:
+            {
+
+            }
+            break;
+            default:{
+                Debugger::getInstance()->print("Should never enter this case option");
                 throw "Should never enter this case option";
+            }
         }
+        Debugger::getInstance()->print("Receiving messages");
     }
 
+    Debugger::getInstance()->print("Exit receiving msg.");
+
     if(rcvInfo.first == -1){
-        cout << rcvInfo.second << endl;
-        cerr << "Error receiving." << endl;
+        Debugger::getInstance()->print(rcvInfo.second.get());
+        Debugger::getInstance()->print("Error receiving.");
         return 0;
     }
 
     if(rcvInfo.first == 0){
-        cout << rcvInfo.second << endl;
-        cout << "Client closed connection." << endl;
+        Debugger::getInstance()->print(rcvInfo.second.get());
+        Debugger::getInstance()->print("Client closed connection.");
     }
 
     return 1;
