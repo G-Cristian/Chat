@@ -66,7 +66,8 @@ private:
     static void* listen(void*);
     Result listenClient(std::shared_ptr<ClientData>);
     Result connectClient(const std::string&, std::shared_ptr<ClientData>);
-    Result sendMessage(const std::string&);
+    Result sendMessage(const std::string&/*msg*/, std::shared_ptr<Connection> /*clientConnection*/);
+    Result sendStatus(std::shared_ptr<Connection>, char, int retries=10);
 
     bool _criticalError;
     int _port;
