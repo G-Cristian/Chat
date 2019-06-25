@@ -5,12 +5,12 @@ std::shared_ptr<Debugger> Debugger::_instance = nullptr;
 Debugger::Debugger(std::ostream &out/*=std::cout*/, std::ostream &err/*=std::cerr*/):
     _stdOut(out),
     _errOut(err){
-    ::init(&_stdOutMutex);
-    ::init(&_errOutMutex);
+    ::initMutex(&_stdOutMutex);
+    ::initMutex(&_errOutMutex);
 }
 Debugger::~Debugger(){
-    ::destroy(&_errOutMutex);
-    ::destroy(&_stdOutMutex);
+    ::destroyMutex(&_errOutMutex);
+    ::destroyMutex(&_stdOutMutex);
 }
 
 void Debugger::initInstance(std::ostream &out, std::ostream &err){

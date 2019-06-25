@@ -17,15 +17,17 @@ public:
         _criticalError(false),
         _port(port),
         _groupsReadCount(0){
-        ::init(&_clientsMutex);
-        ::init(&_groupsMutex);
-        ::init(&_groupsReadCountMutex);
-        ::init(&_groupsServiceMutex);
+        ::initMutex(&_clientsMutex);
+        ::initMutex(&_groupsMutex);
+        ::initMutex(&_groupsReadCountMutex);
+        ::initMutex(&_groupsServiceMutex);
     }
 
     ~Server(){
-        ::destroy(&_groupsMutex);
-        ::destroy(&_clientsMutex);
+        ::destroyMutex(&_groupsServiceMutex);
+        ::destroyMutex(&_groupsReadCountMutex);
+        ::destroyMutex(&_groupsMutex);
+        ::destroyMutex(&_clientsMutex);
     }
     Result start();
 private:
