@@ -1,12 +1,22 @@
 #include "../../Include/commands.h"
 #include "../../Include/connection.h"
+#include "../../Include/debugger.h"
+#include "../../Include/semaphore.h"
 #include <iostream>
 #include <memory>
+#include <pthread.h>
+#include <queue>
 #include <string>
 #include <string.h>
 
+#include <sys/types.h>
+#include <unistd.h>
+
 
 using namespace std;
+
+void *listenerThread(void*);
+void *inputThread(void*);
 
 int main(int argc, char *argv[]){
     if(argc < 3){
@@ -93,66 +103,19 @@ int main(int argc, char *argv[]){
         }
     }while(!connectedOk);
 
-    //send message
-    msg = "";
-    do{
-        cout << "Enter message: ";
-        getline(cin,msg);
-        bool messageSent = false;
-        cout << "Starting to send msg." << endl;
-        int remainigRetries = 10;
-        while(remainigRetries > 0 && !messageSent){
-            messageSent = true;
-            cmd[0] = CLIENT_SENDS_MESSAGE;
-            strcpy(&(cmd[1]),msg.c_str());
-            cout << "Sending msg ( "<< &(cmd[1]) << ")." << endl;
-            if(!connection->sendMsg(cmd)){
-                cerr << "Error sending" << endl;
-                messageSent = false;
-                --remainigRetries;
-            }
-        }
-        if(!messageSent){
-            cerr << "Message not sent." << endl;
-            return 1;
-        }
 
-        remainigRetries=10;
-        bool messageReceived = false;
-        while(remainigRetries > 0 && !messageReceived){
-            messageReceived = true;
-            cout << "Receiving ..." << endl;
-            rcvInfo = connection->rcvMsg();
-            if(!rcvInfo.first){
-                cerr << "Error receiving ..." << endl;
-                messageReceived = false;
-                --remainigRetries;
-            }
-        }
-        
-        if(!messageReceived){
-            cerr << "Didn't receive." << endl;
-            return 1;
-        }
-        char commandReceived = rcvInfo.second.get()[0];
-        if(commandReceived == SERVER_COMMAND_STATUS){
-            cout << "Receiving status." << endl;
-            char statusReceived = rcvInfo.second.get()[1];
-            if(statusReceived == STATUS_MESSAGE_SENT_WITH_FAILS){
-                cout << "Message sent with fails." << endl;
-            }
-            else if(statusReceived != STATUS_OK){
-                cout << "Unknown status (" << statusReceived << ")." << endl;
-            }
-            else{
-                cout << "Message sent." << endl;
-            }
-        }
-        else if(commandReceived == SERVER_CLIENT_SENT_MESSAGE){
-            cout << "Message received: ";
-            cout << &(rcvInfo.second.get()[1]) << endl;
-        }
-    }while(msg != "quit()");
+    if(fork()!= 0){
+        int *inputThreadOutput = (int*)inputThread((void*)connection.get());
+        Debugger::getInstance()->print("inputThreadOutput");
+        Debugger::getInstance()->print(*inputThreadOutput);
+        free(inputThreadOutput);
+    }
+    else{
+        int *listenerThreadOutput = (int*)listenerThread((void*)connection.get());
+        Debugger::getInstance()->print("listenerThreadOutput");
+        Debugger::getInstance()->print(*listenerThreadOutput);
+        free(listenerThreadOutput);
+    }
 /*
     rcvInfo = connection->rcvMsg();
     cout << rcvInfo.second << endl;
@@ -171,4 +134,90 @@ int main(int argc, char *argv[]){
     cout << "End" << endl;
 */
     return 0;
+}
+
+void *listenerThread(void *data){
+    int *ret = (int*)malloc(sizeof(int));
+    *ret = 0;
+    Connection *connection = (Connection*)data;
+    //send message
+    char cmd[300];
+    string msg = "";
+    std::pair<int,std::shared_ptr<char>> rcvInfo;
+    while(true){
+        int remainigRetries=10;
+        bool messageReceived = false;
+        while(remainigRetries > 0 && !messageReceived){
+            messageReceived = true;
+            Debugger::getInstance()->print("Receiving ...");
+            rcvInfo = connection->rcvMsg();
+            if(!rcvInfo.first){
+                Debugger::getInstance()->printErr("Error receiving ...");
+                messageReceived = false;
+                --remainigRetries;
+            }
+        }
+        
+        if(!messageReceived){
+            Debugger::getInstance()->printErr("Didn't receive.");
+            *ret = 1;
+            return (void*)ret;
+        }
+        char commandReceived = rcvInfo.second.get()[0];
+        if(commandReceived == SERVER_COMMAND_STATUS){
+            Debugger::getInstance()->print("Receiving status.");
+            char statusReceived = rcvInfo.second.get()[1];
+            if(statusReceived == STATUS_MESSAGE_SENT_WITH_FAILS){
+                Debugger::getInstance()->print("Message sent with fails.");
+            }
+            else if(statusReceived != STATUS_OK){
+                Debugger::getInstance()->print("Unknown status");
+                Debugger::getInstance()->print(statusReceived);
+            }
+            else{
+                Debugger::getInstance()->print("Message sent.");
+            }
+        }
+        else if(commandReceived == SERVER_CLIENT_SENT_MESSAGE){
+            Debugger::getInstance()->print("Message received: ");
+            Debugger::getInstance()->print(&(rcvInfo.second.get()[1]));
+        }
+    }
+
+    return (void*)ret;
+}
+
+void *inputThread(void *data){
+    int *ret = (int*)malloc(sizeof(int));
+    *ret = 0;
+    Connection *connection = (Connection*)data;
+    //send message
+    char cmd[300];
+    string msg = "";
+    do{
+        cout << "Enter message: ";
+        getline(cin,msg);
+        bool messageSent = false;
+        Debugger::getInstance()->print("Starting to send msg.");
+        int remainigRetries = 10;
+        while(remainigRetries > 0 && !messageSent){
+            messageSent = true;
+            cmd[0] = CLIENT_SENDS_MESSAGE;
+            strcpy(&(cmd[1]),msg.c_str());
+            
+            cout << "Sending msg ( "<< &(cmd[1]) << ")." << endl;
+            if(!connection->sendMsg(cmd)){
+                Debugger::getInstance()->printErr("Error sending");
+                messageSent = false;
+                --remainigRetries;
+            }
+        }
+        if(!messageSent){
+            Debugger::getInstance()->printErr("Message not sent.");
+            *ret=1;
+            return (void*)ret;
+        }
+    }while(msg != "quit()");
+
+    return (void*)ret;
 }
