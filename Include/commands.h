@@ -17,6 +17,7 @@
 #define SERVER_CLIENT_LEFT_GROUP        0x14
 #define SERVER_CLIENT_SENT_MESSAGE      0x15
 #define SERVER_CLIENTS_IN_GROUP         0x16
+#define SERVER_CLIENT_LEFT_CHAT         0x17
 //Status results
 #define STATUS_NONE                     0x20
 #define STATUS_OK                       0x21
@@ -29,5 +30,6 @@
 #define STATUS_RECEIVE_FAIL             0x26
 #define STATUS_MESSAGE_SENT_WITH_FAILS  0x27
 #define STATUS_SERVER_CRITICAL_ERROR    0x28
+#define STATUS_LEFT_CHAT_OK             0x29
 
 #endif

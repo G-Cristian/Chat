@@ -10,6 +10,7 @@
 #include <string.h>
 
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 
@@ -103,9 +104,13 @@ int main(int argc, char *argv[]){
         }
     }while(!connectedOk);
 
-
-    if(fork()!= 0){
+    if(fork() != 0){
         int *inputThreadOutput = (int*)inputThread((void*)connection.get());
+        int status;
+        wait(&status);
+        if(WIFEXITED(status)){
+            cout << "Child exit status: " << WEXITSTATUS(status) << endl;
+        }
         Debugger::getInstance()->print("inputThreadOutput");
         Debugger::getInstance()->print(*inputThreadOutput);
         free(inputThreadOutput);
@@ -144,7 +149,8 @@ void *listenerThread(void *data){
     char cmd[300];
     string msg = "";
     std::pair<int,std::shared_ptr<char>> rcvInfo;
-    while(true){
+    bool mustExit = false;
+    while(!mustExit){
         int remainigRetries=10;
         bool messageReceived = false;
         while(remainigRetries > 0 && !messageReceived){
@@ -170,16 +176,24 @@ void *listenerThread(void *data){
             if(statusReceived == STATUS_MESSAGE_SENT_WITH_FAILS){
                 Debugger::getInstance()->print("Message sent with fails.");
             }
-            else if(statusReceived != STATUS_OK){
-                Debugger::getInstance()->print("Unknown status");
-                Debugger::getInstance()->print(statusReceived);
+            else if(statusReceived == STATUS_LEFT_CHAT_OK){
+                mustExit = true;
+                Debugger::getInstance()->print("Exit Ok.");
+            }
+            else if(statusReceived == STATUS_OK){
+                Debugger::getInstance()->print("Status Ok.");
             }
             else{
-                Debugger::getInstance()->print("Message sent.");
+                Debugger::getInstance()->print("Unknown status");
+                Debugger::getInstance()->print(statusReceived);
             }
         }
         else if(commandReceived == SERVER_CLIENT_SENT_MESSAGE){
             Debugger::getInstance()->print("Message received: ");
+            Debugger::getInstance()->print(&(rcvInfo.second.get()[1]));
+        }
+        else if(commandReceived == SERVER_CLIENT_LEFT_CHAT){
+            Debugger::getInstance()->print("Client left chat");
             Debugger::getInstance()->print(&(rcvInfo.second.get()[1]));
         }
     }
@@ -218,6 +232,25 @@ void *inputThread(void *data){
             return (void*)ret;
         }
     }while(msg != "quit()");
+
+    bool messageSent = false;
+    int remainigRetries = 10;
+    while(remainigRetries > 0 && !messageSent){
+        messageSent = true;
+        cmd[0] = CLIENT_LEAVES_CHAT;
+        cmd[1] = '\0';
+            
+        cout << "Sending CLIENT_LEAVES_CHAT" << endl;
+        if(!connection->sendMsg(cmd)){
+            Debugger::getInstance()->printErr("Error sending");
+            messageSent = false;
+            --remainigRetries;
+        }
+    }
+    if(!messageSent){
+        Debugger::getInstance()->printErr("Message not sent.");
+        *ret=1;
+    }
 
     return (void*)ret;
 }
