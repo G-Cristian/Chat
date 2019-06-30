@@ -1,4 +1,5 @@
 #include "../Include/debugger.h"
+#include <utility>
 
 std::shared_ptr<Debugger> Debugger::_instance = nullptr;
 
@@ -29,26 +30,40 @@ void Debugger::dispose(){
     _instance = nullptr;
 }
 
-void Debugger::print(const std::string &msg){
-    ::lock(&_stdOutMutex);
-    _stdOut << msg << std::endl;
-    ::unlock(&_stdOutMutex);
+std::ostream& Debugger::printAux(std::ostream &outstream, const std::string &val)const{
+    #ifdef DEBUG
+    outstream << "std::ostream& Debugger::printAux(std::ostream &outstream, const std::string &val)const" << std::endl;
+    #endif
+    return outstream << "\"" << val << "\"";
 }
 
-void Debugger::print(const char *msg){
-    ::lock(&_stdOutMutex);
-    _stdOut << msg << std::endl;
-    ::unlock(&_stdOutMutex);
+std::ostream& Debugger::printAux(std::ostream &outstream, std::nullptr_t val)const{
+    #ifdef DEBUG
+    outstream << "std::ostream& Debugger::printAux(std::ostream &outstream, std::nullptr_t val)const" << std::endl;
+    #endif
+    return outstream << "nullptr";
 }
 
-void Debugger::printErr(const std::string &msg){
-    ::lock(&_errOutMutex);
-    _errOut << msg << std::endl;
-    ::unlock(&_errOutMutex);
+std::ostream& Debugger::printAux(std::ostream &outstream, const char *val)const{
+    #ifdef DEBUG
+    outstream << "std::ostream& Debugger::printAux(std::ostream &outstream, const char *val)const" << std::endl;
+    #endif
+    if(val){
+        return printAux(outstream, std::string(val));
+    }
+    else{
+        return outstream << "NULL";
+    }
 }
 
-void Debugger::printErr(const char *msg){
-    ::lock(&_errOutMutex);
-    _errOut << msg << std::endl;
-    ::unlock(&_errOutMutex);
+std::ostream& Debugger::printAux(std::ostream &outstream, char *val)const{
+    #ifdef DEBUG
+    outstream << "std::ostream& Debugger::printAux(std::ostream &outstream, char *val)const" << std::endl;
+    #endif
+    if(val){
+        return printAux(outstream, std::string(val));
+    }
+    else{
+        return outstream << "NULL";
+    }
 }
