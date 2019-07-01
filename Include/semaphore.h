@@ -1,10 +1,21 @@
 #ifndef _SEMAPHORE_H_
 #define _SEMAPHORE_H_
 
+#if defined(__linux__) || defined(__unix__)
+//linux based
 #include <pthread.h>
 
 typedef pthread_mutex_t Mutex;
 typedef pthread_cond_t Conditional;
+#elif defined(_WIN32) || defined(WIN32)
+//windows based
+#include <windows.h>
+
+typedef CRITICAL_SECTION Mutex;
+typedef CONDITION_VARIABLE Conditional;
+#else
+#error "OS not supperted."
+#endif
 
 int initMutex(Mutex*);
 int destroyMutex(Mutex*);
