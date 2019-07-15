@@ -1,9 +1,14 @@
+
+#include "../Include/server.h"
+#include "../../Include/connection.h"
 #include "../../Include/commands.h"
 #include "../../Include/debugger.h"
-#include "../Include/server.h"
 #include <iostream>
 #include <list>
+#if defined(__linux__) || defined(__unix__)
+//linux based
 #include <pthread.h>
+#endif
 #include <string>
 #include <string.h>
 
@@ -26,7 +31,15 @@ int Server::start() {
         return 0;
     }
 
+#if defined(__linux__) || defined(__unix__)
+	//linux based
     list <pthread_t> threads;
+#elif defined(_WIN32) || defined(WIN32)
+	//windows based
+	list <HANDLE> threads;
+#else
+#error "OS not supperted."
+#endif
     Group *globalGroup = new Group();
     globalGroup->name = GLOBAL_GROUP_NAME;
     _groups[GLOBAL_GROUP_NAME] = shared_ptr<Group>(globalGroup);
@@ -38,13 +51,37 @@ int Server::start() {
         threads.push_back(crerateListenerThread(clientConnection));
     }
 
+#if defined(_WIN32) || defined(WIN32)
+//windows based
+	HANDLE *threadsArr = new HANDLE[threads.size()];
+	HANDLE *threadsArrPtr = threadsArr;
+	for (auto it = threads.begin(); it != threads.end(); it++) {
+		if (*it != NULL) {
+			*threadsArrPtr = *it;
+			threadsArrPtr++;
+		}
+	}
+	WaitForMultipleObjects(threads.size(), threadsArr, TRUE, INFINITE);
+	delete[] threadsArr;
+#endif        
+
     for(auto it = threads.begin(); it != threads.end(); it++){
-        pthread_join(*it, NULL);
+#if defined(__linux__) || defined(__unix__)
+		//linux based
+		pthread_join(*it, NULL);
+#elif defined(_WIN32) || defined(WIN32)
+		//windows based
+		CloseHandle(*it);
+#else
+#error "OS not supperted."
+#endif        
     }
 
     return 1;
 }
 
+#if defined(__linux__) || defined(__unix__)
+//linux based
 pthread_t Server::crerateListenerThread(std::shared_ptr<Connection> clientConnection){
     pthread_t threadId;
     ClientData *clientData = new ClientData();
@@ -61,7 +98,31 @@ pthread_t Server::crerateListenerThread(std::shared_ptr<Connection> clientConnec
 
     return threadId;
 }
+#elif defined(_WIN32) || defined(WIN32)
+//windows based
+HANDLE Server::crerateListenerThread(std::shared_ptr<Connection> clientConnection) {
+	DWORD threadId;
+	HANDLE handle = NULL;
+	ClientData *clientData = new ClientData();
+	clientData->server = this;
+	clientData->connection = clientConnection;
 
+	handle = CreateThread(NULL, 0, Server::listen, (LPVOID)clientData, 0, &threadId);
+	if (handle != NULL) {
+		Debugger::getInstance()->print("Created listener thread.");
+	}
+	else {
+		Debugger::getInstance()->print("Error creating listener thread.");
+	}
+
+	return handle;
+}
+#else
+#error "OS not supperted."
+#endif
+
+#if defined(__linux__) || defined(__unix__)
+//linux based
 void* Server::listen(void *data){
     using namespace std;
 
@@ -77,6 +138,26 @@ void* Server::listen(void *data){
 
     return NULL;
 }
+#elif defined(_WIN32) || defined(WIN32)
+//windows based
+DWORD WINAPI Server::listen(LPVOID data) {
+	using namespace std;
+
+	shared_ptr<ClientData> clientData((ClientData*)data);
+	Server *server = clientData->server;
+
+	if (server->listenClient(clientData)) {
+		Debugger::getInstance()->print("Client disconnected successfully.");
+	}
+	else {
+		Debugger::getInstance()->print("Error listening client.");
+	}
+
+	return 0;
+}
+#else
+#error "OS not supperted."
+#endif
 
 int Server::listenClient(std::shared_ptr<Server::ClientData> clientData){
     using namespace std;
@@ -214,6 +295,8 @@ Server::Result Server::removeClient(std::shared_ptr<Server::ClientData> clientDa
     
     ::unlock(&_clientsMutex);
     UNLOCK_WRITE_GROUP();
+
+	return result;
 }
 
 Server::Result Server::sendMessage(const std::string &msg, std::shared_ptr<Connection> clientConnection){
@@ -239,7 +322,7 @@ Server::Result Server::sendMessage(const std::string &msg, std::shared_ptr<Conne
         for(;clientsIt != end; clientsIt++){
             std::shared_ptr<Connection> connection = (*clientsIt)->connection;
             if(clientConnection != connection){
-                if(!connection->sendMsg(sendInfo)){
+                if(!connection->sendMsg<300>(sendInfo)){
                     Debugger::getInstance()->print("Error sending message");
                     res = 0;
                     status = STATUS_MESSAGE_SENT_WITH_FAILS;
@@ -282,7 +365,7 @@ Server::Result Server::sendStatus(std::shared_ptr<Connection> clientConnection, 
     
     int remainingRetries = retries;
 
-    while(!clientConnection->sendMsg(sendInfo) && remainingRetries > 0){
+    while(!clientConnection->sendMsg<300>(sendInfo) && remainingRetries > 0){
         Debugger::getInstance()->print("Error sending status to client.");
         --remainingRetries;
     }
@@ -320,7 +403,7 @@ Server::Result Server::sendClientLeftCommand(const std::string &clientName, std:
         for(;clientsIt != end; clientsIt++){
             std::shared_ptr<Connection> connection = (*clientsIt)->connection;
             if(clientConnection != connection){
-                if(!connection->sendMsg(sendInfo)){
+                if(!connection->sendMsg<300>(sendInfo)){
                     Debugger::getInstance()->print("Error sending command");
                     res = 0;
                     status = STATUS_MESSAGE_SENT_WITH_FAILS;

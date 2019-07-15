@@ -6,7 +6,17 @@
 #include <list>
 #include <map>
 #include <memory>
+#if defined(__linux__) || defined(__unix__)
+//linux based
 #include <pthread.h>
+#elif defined(_WIN32) || defined(WIN32)
+//windows based
+#include <windows.h>
+#include <tchar.h>
+#include <strsafe.h>
+#else
+#error "OS not supperted."
+#endif
 #include <set>
 #include <string>
 
@@ -64,8 +74,17 @@ private:
         Group& operator=(Group &&) = delete;
     };
 
+#if defined(__linux__) || defined(__unix__)
+	//linux based
     pthread_t crerateListenerThread(std::shared_ptr<Connection>);
     static void* listen(void*);
+#elif defined(_WIN32) || defined(WIN32)
+	//windows based
+	HANDLE crerateListenerThread(std::shared_ptr<Connection>);
+	static DWORD WINAPI listen(LPVOID);
+#else
+#error "OS not supperted."
+#endif
     Result listenClient(std::shared_ptr<ClientData>);
     Result connectClient(const std::string&, std::shared_ptr<ClientData>);
     Result removeClient(std::shared_ptr<ClientData>);
