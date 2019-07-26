@@ -23,6 +23,8 @@ namespace WinChatClient
 		private static Queue<string> _messages = new Queue<string>();
 		private static EventWaitHandle _messagesLock = new EventWaitHandle(true, EventResetMode.AutoReset);
 		private static EventWaitHandle _notEmpty = new EventWaitHandle(false, EventResetMode.AutoReset);
+		private static EventWaitHandle _endReading = new EventWaitHandle(false, EventResetMode.AutoReset);
+		private static EventWaitHandle _endConsuming = new EventWaitHandle(false, EventResetMode.AutoReset);
 
 		public formChat()
 		{
@@ -33,7 +35,7 @@ namespace WinChatClient
 		{
 			formConfigConnection configConnForm = new formConfigConnection();
 			configConnForm.Config = _config;
-			if(configConnForm.ShowDialog(this) == DialogResult.OK)
+			if (configConnForm.ShowDialog(this) == DialogResult.OK)
 			{
 				CloseConnection();
 				Connect();
@@ -62,9 +64,10 @@ namespace WinChatClient
 
 			try {
 				_socket.Connect(ips[0], int.Parse(_config.Port));
-				tbOutput.Text += "\n";
+				tbOutput.Text += System.Environment.NewLine;
 				tbOutput.Text += "------------";
 				tbOutput.Text += "Connection Stablished";
+				connectionToolStripMenuItem.Enabled = false;
 				if (SendName())
 				{
 					new Thread(Read_Callback).Start();
@@ -73,7 +76,7 @@ namespace WinChatClient
 			catch(Exception ex)
 			{
 				bOk = false;
-				tbOutput.Text += "\n";
+				tbOutput.Text += System.Environment.NewLine;
 				tbOutput.Text += "------------";
 				tbOutput.Text += ex.ToString();
 			}
@@ -83,9 +86,9 @@ namespace WinChatClient
 
 		public void Read_Callback()
 		{
-			//TODO: Complete this method, check errors and check server status;
-			bool reading = true;
-			while (reading)
+			bool leaveChat = false;
+			int byteRecv = 0;
+			do
 			{
 				byte[] messageReceived = new byte[300];
 
@@ -94,14 +97,54 @@ namespace WinChatClient
 				// method returns number of bytes 
 				// received, that we'll use to  
 				// convert them to string 
-				int byteRecv = _socket.Receive(messageReceived);
-				//TODO: Interpret received status, command, etc.
-				//TODO: check errors.
-				//TODO: add messages to queue of messages to print.
-				byte status = messageReceived[0];
-				string msg = Encoding.ASCII.GetString(messageReceived,
-												 1, byteRecv - 1);
+				byteRecv = _socket.Receive(messageReceived);
+				if (byteRecv > 1)
+				{
+					if (messageReceived[0] == 0x11)
+					{
+						//SERVER_COMMAND_STATUS           0x11
+						byte status = messageReceived[1];
+						if (status == 0x27)
+						{
+							//STATUS_MESSAGE_SENT_WITH_FAILS  0x27
+							ProduceMsg("MESSAGE SENT WITH FAILS");
+						}
+						else if (status == 0x29)
+						{
+							//STATUS_LEFT_CHAT_OK             0x29
+							leaveChat = true;
+
+						}
+						else if (status != 0x21)
+						{
+							//STATUS_OK                       0x21
+							ProduceMsg("Unexpected status received.");
+						}
+					}
+					else if (messageReceived[0] == 0x15) {
+						//SERVER_CLIENT_SENT_MESSAGE      0x15
+						string msg = Encoding.ASCII.GetString(messageReceived,
+														 1, byteRecv - 1);
+						ProduceMsg(msg);
+					}
+					else if (messageReceived[0] == 0x17)
+					{
+						//SERVER_CLIENT_LEFT_CHAT         0x17
+						string clientName = Encoding.ASCII.GetString(messageReceived,
+														 1, byteRecv - 1);
+						ProduceMsg(string.Concat(clientName.Substring(0, clientName.IndexOf('\0'))," left chat."));
+					}
+				}
+			} while (!leaveChat && byteRecv > 0);
+
+			if(byteRecv == 0)
+			{
+				ProduceMsg("Connection closed by server.");
+			}else if(byteRecv < 0)
+			{
+				ProduceMsg("Error receiving");
 			}
+			_endReading.Set();
 		}
 
 		private byte ReadStatus(Socket socket)
@@ -134,17 +177,14 @@ namespace WinChatClient
 			bool errorSendingName = true;
 			do
 			{
-				if (string.IsNullOrEmpty(_name))
+				EnterNameForm nameForm = new EnterNameForm();
+				if (nameForm.ShowDialog(this) == DialogResult.OK)
 				{
-					EnterNameForm nameForm = new EnterNameForm();
-					if (nameForm.ShowDialog(this) == DialogResult.OK)
-					{
-						_name = nameForm.GetName;
-					}
-
+					_name = nameForm.GetName;
 				}
+
 				//CLIENT_CONNECTS         0x01
-				SendMsg(1, _name);
+				SendMsg(1, _name+'\0');
 				byte status = ReadStatus(_socket);
 
 				//STATUS_OK                       0x21
@@ -178,10 +218,10 @@ namespace WinChatClient
 		private void OnSendClick(object sender, EventArgs e)
 		{
 			//TODO: Complete this method, checking errors and checking server status;
+			ProduceMsg(tbInput.Text);
 			//CLIENT_SENDS_MESSAGE    0x06
-			byte[] msg = Encoding.ASCII.GetBytes("6" + tbInput.Text);
-			msg[0] = (byte)(6);
-			_socket.Send(msg);
+			SendMsg(6, tbInput.Text+'\0');
+			tbInput.Text = String.Empty;
 		}
 
 		private void ProduceMsg(string msg)
@@ -209,6 +249,7 @@ namespace WinChatClient
 				}
 				_messagesLock.Set();
 			}
+			_endConsuming.Set();
 		}
 
 		private void PrintMessage(string msg)
@@ -219,13 +260,32 @@ namespace WinChatClient
 				return;
 			}
 
-			tbOutput.Text += "\n";
+			tbOutput.Text += System.Environment.NewLine;
 			tbOutput.Text += msg;
 		}
 
 		private void formChat_Load(object sender, EventArgs e)
 		{
 			new Thread(ConsumeMsg).Start();
+		}
+
+		private void formChat_FormClosing(object sender, FormClosingEventArgs e)
+		{
+			if (_socket != null)
+			{
+				//CLIENT_LEAVES_CHAT      0x07
+				SendMsg(7, "");
+			}
+			_exiting = true;
+			_notEmpty.Set();
+			_endReading.WaitOne(10000);
+			_endConsuming.WaitOne(10000);
+			_notEmpty.Close();
+			_endConsuming.Close();
+			_endReading.Close();
+			_messagesLock.Close();
+			CloseConnection();
+			MessageBox.Show("Good bye");
 		}
 	}
 }

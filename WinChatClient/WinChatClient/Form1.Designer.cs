@@ -71,6 +71,7 @@
 			this.tbOutput.Location = new System.Drawing.Point(12, 30);
 			this.tbOutput.Multiline = true;
 			this.tbOutput.Name = "tbOutput";
+			this.tbOutput.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
 			this.tbOutput.Size = new System.Drawing.Size(499, 205);
 			this.tbOutput.TabIndex = 0;
 			// 
@@ -132,6 +133,7 @@
 			this.MainMenuStrip = this.menuStrip1;
 			this.Name = "formChat";
 			this.Text = "Chat";
+			this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.formChat_FormClosing);
 			this.Load += new System.EventHandler(this.formChat_Load);
 			this.splitContainer1.Panel1.ResumeLayout(false);
 			this.splitContainer1.Panel1.PerformLayout();
