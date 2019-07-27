@@ -37,7 +37,7 @@ struct Connection{
     typedef uint16_t PORT;
     typedef struct sockaddr_in SOCKADDR;
     typedef socklen_t SOCKLEN;
-	using INVALID_SOCKET = -1;
+	const int INVALID_SOCKET = -1;
 #elif defined(_WIN32) || defined(WIN32)
 	//windows based
 	typedef SOCKET SOCKET;
